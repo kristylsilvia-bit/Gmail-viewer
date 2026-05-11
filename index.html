@@ -232,8 +232,9 @@
   }
 
   .detail-body-iframe {
-    width: 100%; min-height: 500px; border: none;
+    width: 100%; border: none;
     background: white; border-radius: 8px;
+    display: block;
   }
 
   .loading {
@@ -543,7 +544,7 @@ async function openEmail(id) {
     renderList();
 
     const bodyContent = bodyHtml
-      ? `<iframe class="detail-body-iframe" srcdoc="${esc(bodyHtml)}" sandbox="allow-same-origin"></iframe>`
+      ? `<iframe class="detail-body-iframe" srcdoc="${esc(bodyHtml)}" sandbox="allow-same-origin" onload="this.style.height=(this.contentDocument.documentElement.scrollHeight||this.contentDocument.body.scrollHeight)+'px'"></iframe>`
       : `<div class="detail-body">${esc(bodyText || msg.snippet || '(no content)')}</div>`;
 
     detailEl.innerHTML = `
