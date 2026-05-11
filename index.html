@@ -232,8 +232,9 @@
   }
 
   .detail-body-iframe {
-    width: 100%; min-height: 500px; border: none;
+    width: 100%; border: none;
     background: white; border-radius: 8px;
+    display: block; overflow: hidden;
   }
 
   .loading {
@@ -346,6 +347,20 @@
 </div>
 
 <script>
+function resizeIframe(iframe) {
+  function setHeight() {
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      const h = Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+      if (h > 0) iframe.style.height = h + 'px';
+      else setTimeout(setHeight, 100);
+    } catch(e) {
+      iframe.style.height = '800px';
+    }
+  }
+  requestAnimationFrame(setHeight);
+}
+
 let allEmails = [];
 let nextPageToken = null;
 let currentFilter = 'all';
@@ -543,7 +558,7 @@ async function openEmail(id) {
     renderList();
 
     const bodyContent = bodyHtml
-      ? `<iframe class="detail-body-iframe" srcdoc="${esc(bodyHtml)}" sandbox="allow-same-origin"></iframe>`
+      ? `<iframe class="detail-body-iframe" srcdoc="${esc(bodyHtml)}" sandbox="allow-same-origin" scrolling="no" onload="resizeIframe(this)"></iframe>`
       : `<div class="detail-body">${esc(bodyText || msg.snippet || '(no content)')}</div>`;
 
     detailEl.innerHTML = `
