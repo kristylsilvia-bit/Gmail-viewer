@@ -1,3 +1,5 @@
+import { OAUTH_SCOPES } from './_google.js';
+
 export default function handler(req, res) {
   const CLIENT_ID = process.env.GMAIL_CLIENT_ID;
   const REDIRECT_URI = `https://${req.headers.host}/auth/callback`;
@@ -6,9 +8,9 @@ export default function handler(req, res) {
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
     response_type: 'code',
-    scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email',
+    scope: OAUTH_SCOPES,
     access_type: 'offline',
-    prompt: 'consent'
+    prompt: 'consent select_account',
   });
 
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
