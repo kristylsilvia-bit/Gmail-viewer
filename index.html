@@ -699,21 +699,14 @@ function goBack() {
 // Password gate
 (function() {
   const CORRECT = '12184412184402638';
-  const SESSION_KEY = 'mv_auth';
   const gate = document.getElementById('pw-gate');
   const input = document.getElementById('pw-input');
   const submit = document.getElementById('pw-submit');
   const errorEl = document.getElementById('pw-error');
   const toggle = document.getElementById('pw-toggle');
 
-  if (sessionStorage.getItem(SESSION_KEY) === '1') {
-    gate.classList.add('hidden');
-    return;
-  }
-
   function attempt() {
     if (input.value === CORRECT) {
-      sessionStorage.setItem(SESSION_KEY, '1');
       gate.classList.add('hidden');
     } else {
       errorEl.textContent = 'Incorrect password.';
