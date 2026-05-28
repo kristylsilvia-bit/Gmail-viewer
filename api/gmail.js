@@ -2,6 +2,32 @@ import {
   resolveAccount, getAccounts, getActiveEmail, getAccessToken, gapi,
   saveAccounts, setActive, clearAccountCookies,
 } from './_google.js';
+import {
+  imapList, imapMessage, imapModify, imapTrash, imapUntrash, imapDelete, imapSend,
+} from './_imap.js';
+
+async function handleImap(req, res, account, action, query, body) {
+  try {
+    if (action === 'userinfo') return res.json({ email: account.email, name: account.name });
+    if (action === 'labels') return res.json({ labels: [] });
+    if (action === 'message' && (query.id || body.id)) {
+      return res.json(await imapMessage(account, query.id || body.id));
+    }
+    if (req.method === 'POST') {
+      if (action === 'send') return res.json(await imapSend(account, body));
+      if (action === 'trash') return res.json(await imapTrash(account, body.id));
+      if (action === 'untrash') return res.json(await imapUntrash(account, body.id));
+      if (action === 'delete') return res.json(await imapDelete(account, body.id));
+      if (action === 'modify') return res.json(await imapModify(account, body));
+    }
+    const folder = query.label && query.label !== 'SEARCH' ? query.label : (query.q ? 'SEARCH' : 'ALL');
+    return res.json(await imapList(account, { folder, q: query.q, pageToken: query.pageToken }));
+  } catch (e) {
+    const msg = e.message || String(e);
+    const authFail = /auth|login|credential|invalid|denied/i.test(msg);
+    return res.status(authFail ? 401 : 500).json({ error: msg, needReconnect: authFail });
+  }
+}
 
 function mimeWord(str) {
   // Encode a header value as a MIME encoded-word if it contains non-ASCII.
@@ -40,8 +66,8 @@ export default async function handler(req, res) {
   // ── Account management actions (no Gmail call needed) ──
   if (action === 'accounts') {
     const accounts = getAccounts(req);
-    const env = !accounts.length && process.env.GMAIL_REFRESH_TOKEN ? [{ email: process.env.GMAIL_EMAIL || 'Connected account', name: '', env: true }] : [];
-    const list = accounts.length ? accounts.map(a => ({ email: a.email, name: a.name })) : env;
+    const env = !accounts.length && process.env.GMAIL_REFRESH_TOKEN ? [{ email: process.env.GMAIL_EMAIL || 'Connected account', name: '', kind: 'google', env: true }] : [];
+    const list = accounts.length ? accounts.map(a => ({ email: a.email, name: a.name, kind: a.kind || 'google', service: a.service })) : env;
     return res.json({ accounts: list, active: getActiveEmail(req) || (list[0] && list[0].email) || null });
   }
 
@@ -63,9 +89,12 @@ export default async function handler(req, res) {
     return res.json({ ok: true, accounts: accounts.map(a => ({ email: a.email, name: a.name })) });
   }
 
-  // ── Everything else needs an authenticated Gmail account ──
+  // ── Everything else needs an authenticated account ──
   const account = resolveAccount(req);
   if (!account) return res.status(401).json({ error: 'Not signed in', needAuth: true });
+
+  // Non-Gmail providers (iCloud, AOL, Yahoo) go through IMAP/SMTP.
+  if (account.kind === 'imap') return handleImap(req, res, account, action, query, body);
 
   let accessToken;
   try {

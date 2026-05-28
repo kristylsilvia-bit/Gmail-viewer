@@ -73,10 +73,11 @@ export function resolveAccount(req) {
   const active = getActiveEmail(req);
   if (accounts.length) {
     const found = accounts.find(a => a.email === active) || accounts[0];
-    return { refreshToken: found.refreshToken, email: found.email, name: found.name, source: 'cookie' };
+    return { ...found, kind: found.kind || 'google', source: 'cookie' };
   }
   if (process.env.GMAIL_REFRESH_TOKEN) {
     return {
+      kind: 'google',
       refreshToken: process.env.GMAIL_REFRESH_TOKEN,
       email: process.env.GMAIL_EMAIL || '',
       name: '',

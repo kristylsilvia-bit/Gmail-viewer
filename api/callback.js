@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
     const accounts = getAccounts(req);
     const idx = accounts.findIndex(a => a.email === email);
-    const entry = { email, name, refreshToken };
+    const entry = { kind: 'google', email, name, refreshToken };
     if (idx > -1) accounts[idx] = entry;
     else accounts.push(entry);
 

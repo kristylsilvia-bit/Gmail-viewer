@@ -1,5 +1,10 @@
 {
   "name": "gmail-viewer",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "imapflow": "^1.0.171",
+    "mailparser": "^3.7.1",
+    "nodemailer": "^6.9.14"
+  }
 }
