@@ -92,6 +92,20 @@ export default async function handler(req, res) {
 
     // ── POST mutations ──
     if (req.method === 'POST') {
+      // Helper: surface Google scope errors as a re-auth prompt.
+      const checkErr = (data) => {
+        const msg = data?.error?.message || '';
+        if (/insufficient.*scope|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(msg)) {
+          res.status(403).json({
+            error: 'This account is signed in with read-only access. Sign in with Google again to enable sending and managing mail.',
+            needScope: true,
+          });
+          return true;
+        }
+        if (data?.error) { res.status(400).json({ error: msg }); return true; }
+        return false;
+      };
+
       if (action === 'send') {
         const raw = buildRaw({ ...body, from: account.email });
         const payload = { raw };
@@ -102,24 +116,30 @@ export default async function handler(req, res) {
           body: JSON.stringify(payload),
         });
         const data = await r.json();
-        if (data.error) return res.status(400).json({ error: data.error.message });
+        if (checkErr(data)) return;
         return res.json(data);
       }
 
       if (action === 'trash') {
         const r = await gapi(accessToken, `messages/${body.id}/trash`, { method: 'POST' });
-        return res.json(await r.json());
+        const data = await r.json();
+        if (checkErr(data)) return;
+        return res.json(data);
       }
 
       if (action === 'untrash') {
         const r = await gapi(accessToken, `messages/${body.id}/untrash`, { method: 'POST' });
-        return res.json(await r.json());
+        const data = await r.json();
+        if (checkErr(data)) return;
+        return res.json(data);
       }
 
       if (action === 'delete') {
         const r = await gapi(accessToken, `messages/${body.id}`, { method: 'DELETE' });
         if (r.status === 204) return res.json({ ok: true });
-        return res.json(await r.json().catch(() => ({ ok: true })));
+        const data = await r.json().catch(() => ({}));
+        if (checkErr(data)) return;
+        return res.json(data.error ? data : { ok: true });
       }
 
       if (action === 'modify') {
@@ -131,7 +151,9 @@ export default async function handler(req, res) {
             removeLabelIds: body.removeLabelIds || [],
           }),
         });
-        return res.json(await r.json());
+        const data = await r.json();
+        if (checkErr(data)) return;
+        return res.json(data);
       }
     }
 

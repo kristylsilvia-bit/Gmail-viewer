@@ -457,8 +457,14 @@ async function apiPost(payload) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({ error: res.statusText }));
-  if (!res.ok) { const e = new Error(data.error || res.statusText); e.needAuth = data.needAuth; throw e; }
+  if (!res.ok) { const e = new Error(data.error || res.statusText); e.needAuth = data.needAuth; e.needScope = data.needScope; throw e; }
   return data;
+}
+
+// When an account lacks write scopes, send the user back through Google sign-in.
+function promptReauth(msg) {
+  toast(msg || 'Sign in with Google to enable this');
+  setTimeout(() => { window.location.href = '/api/auth'; }, 1400);
 }
 
 // ── ACCOUNTS ──
@@ -787,46 +793,57 @@ function goBack() {
 }
 
 // ── ACTIONS ──
+// Run a mutation; on scope/auth failure, route the user to re-authenticate.
+async function mutate(payload) {
+  try {
+    return await apiPost(payload);
+  } catch (e) {
+    if (e.needScope || e.needAuth) { promptReauth(e.message); }
+    else toast('Error: ' + e.message);
+    throw e;
+  }
+}
+
 function markRead(id, removeFromView) {
   apiPost({ action: 'modify', id, removeLabelIds: ['UNREAD'] }).catch(() => {});
 }
 async function markUnreadAndClose(id) {
-  await apiPost({ action: 'modify', id, addLabelIds: ['UNREAD'] });
+  try { await mutate({ action: 'modify', id, addLabelIds: ['UNREAD'] }); } catch { return; }
   const e = allEmails.find(x => x.id === id); if (e) e.unread = true;
   selectedId = null; closeDetail(); renderList(); toast('Marked as unread');
 }
 async function toggleStar(id, fromDetail) {
   const e = allEmails.find(x => x.id === id);
   const wasStarred = e ? e.starred : (currentMessage?.labelIds || []).includes('STARRED');
-  await apiPost({ action: 'modify', id, [wasStarred ? 'removeLabelIds' : 'addLabelIds']: ['STARRED'] });
+  try { await mutate({ action: 'modify', id, [wasStarred ? 'removeLabelIds' : 'addLabelIds']: ['STARRED'] }); } catch { return; }
   if (e) e.starred = !wasStarred;
   if (currentFolder === 'STARRED' && wasStarred) { allEmails = allEmails.filter(x => x.id !== id); if (selectedId === id) { selectedId = null; closeDetail(); } }
   renderList();
   if (fromDetail && selectedId === id) openEmail(id);
 }
 async function trashEmail(id) {
-  await apiPost({ action: 'trash', id });
+  try { await mutate({ action: 'trash', id }); } catch { return; }
   removeFromList(id); toast('Moved to Trash');
 }
 async function untrashEmail(id) {
-  await apiPost({ action: 'untrash', id });
+  try { await mutate({ action: 'untrash', id }); } catch { return; }
   removeFromList(id); toast('Restored');
 }
 async function deleteEmail(id) {
   if (!confirm('Permanently delete this email? This cannot be undone.')) return;
-  await apiPost({ action: 'delete', id });
+  try { await mutate({ action: 'delete', id }); } catch { return; }
   removeFromList(id); toast('Deleted forever');
 }
 async function archiveEmail(id) {
-  await apiPost({ action: 'modify', id, removeLabelIds: ['INBOX'] });
+  try { await mutate({ action: 'modify', id, removeLabelIds: ['INBOX'] }); } catch { return; }
   removeFromList(id); toast('Archived');
 }
 async function markSpam(id) {
-  await apiPost({ action: 'modify', id, addLabelIds: ['SPAM'], removeLabelIds: ['INBOX'] });
+  try { await mutate({ action: 'modify', id, addLabelIds: ['SPAM'], removeLabelIds: ['INBOX'] }); } catch { return; }
   removeFromList(id); toast('Marked as spam');
 }
 async function notSpam(id) {
-  await apiPost({ action: 'modify', id, removeLabelIds: ['SPAM'], addLabelIds: ['INBOX'] });
+  try { await mutate({ action: 'modify', id, removeLabelIds: ['SPAM'], addLabelIds: ['INBOX'] }); } catch { return; }
   removeFromList(id); toast('Moved to Inbox');
 }
 function removeFromList(id) {
@@ -892,7 +909,12 @@ async function sendEmail() {
     toast('Message sent');
     if (currentFolder === 'SENT') loadEmails();
   } catch (e) {
-    document.getElementById('compose-status').textContent = 'Error: ' + e.message;
+    if (e.needScope || e.needAuth) {
+      document.getElementById('compose-status').innerHTML =
+        'Read-only access — <a href="/api/auth" style="color:var(--accent2)">sign in with Google</a> to enable sending.';
+    } else {
+      document.getElementById('compose-status').textContent = 'Error: ' + e.message;
+    }
   } finally {
     btn.disabled = false;
   }
