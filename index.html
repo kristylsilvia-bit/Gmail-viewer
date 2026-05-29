@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark" data-density="comfortable">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Mail</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +11,7 @@
   /* ====== DESIGN TOKENS ====== */
   :root {
     --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px; --s-6:24px; --s-8:32px;
+    --header-h: 64px;
     --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:22px; --r-full:999px;
     --aurora: linear-gradient(135deg, #6366F1 0%, #8B5CF6 48%, #D946EF 100%);
     --aurora-soft: linear-gradient(135deg, rgba(99,102,241,.16), rgba(217,70,239,.16));
@@ -53,8 +54,9 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     background: var(--bg-grad); background-attachment: fixed; color: var(--text);
-    font-family: var(--font); height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    font-family: var(--font); height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
     -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
     transition: background var(--t-base) var(--ease), color var(--t-base) var(--ease);
   }
   button, input, textarea { font-family: inherit; color: inherit; }
@@ -67,7 +69,7 @@
   /* ── HEADER ── */
   header {
     display: flex; align-items: center; gap: var(--s-4);
-    padding: 0 var(--s-5); height: 64px; background: var(--surface);
+    padding: 0 var(--s-5); height: var(--header-h); background: var(--surface);
     border-bottom: 1px solid var(--border); flex-shrink: 0;
   }
   .logo { display: flex; align-items: center; gap: 11px; user-select: none; flex-shrink: 0; }
@@ -120,7 +122,7 @@
     background: var(--aurora);
   }
   .account-menu {
-    position: absolute; right: 0; top: 50px; width: 300px;
+    position: absolute; right: 0; top: 50px; width: 300px; max-width: calc(100vw - 24px);
     background: var(--surface2); border: 1px solid var(--border2);
     border-radius: var(--r-lg); padding: var(--s-2); z-index: 200; display: none;
     box-shadow: var(--shadow-3);
@@ -452,27 +454,95 @@
     .collapse-btn { display: none; }
     .email-list { width: 360px; }
   }
+  /* dim backdrop behind the mobile sidebar drawer */
+  .nav-scrim { display: none; position: fixed; inset: 0; top: var(--header-h); z-index: 25;
+    background: rgba(5,5,12,.5); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+    opacity: 0; pointer-events: none; transition: opacity var(--t-base) var(--ease); }
+  body.menu-open .nav-scrim { opacity: 1; pointer-events: auto; }
+
   @media (max-width: 820px) {
-    .sidebar { position: fixed; left: 0; top: 64px; bottom: 0; z-index: 30; width: 248px !important;
+    :root { --header-h: calc(58px + env(safe-area-inset-top)); }
+    header { padding-top: env(safe-area-inset-top);
+      padding-left: max(var(--s-4), env(safe-area-inset-left));
+      padding-right: max(var(--s-4), env(safe-area-inset-right)); gap: var(--s-2); }
+
+    /* sidebar → off-canvas drawer */
+    .sidebar { position: fixed; left: 0; top: var(--header-h); bottom: 0; z-index: 30;
+      width: min(86vw, 320px) !important;
+      padding-bottom: max(var(--s-4), env(safe-area-inset-bottom));
+      border-right: 1px solid var(--border); border-radius: 0 var(--r-xl) var(--r-xl) 0;
       transform: translateX(-100%); transition: transform var(--t-base) var(--ease); box-shadow: var(--shadow-3); }
     body.menu-open .sidebar { transform: none; }
     body .compose-btn span, body .nav-item span:not(.nav-count), body .nav-item .nav-count,
     body .sidebar-profile .sp-meta { display: revert; }
-    body .compose-btn { padding: 13px; }
-    body .nav-item, body .sidebar-profile { justify-content: flex-start; }
+    body .compose-btn { padding: 14px; }
+    body .nav-item { justify-content: flex-start; padding: 12px var(--s-3); }
+    body .sidebar-profile { justify-content: flex-start; }
+    .collapse-btn { display: none; }
+    .nav-scrim { display: block; }
     .menu-toggle { display: grid; }
-    .email-list { width: 100%; border-right: none; }
-    .email-detail { position: fixed; inset: 0; top: 64px; z-index: 20; display: none; }
+
+    /* single-pane list + detail */
+    .email-list { width: 100%; border-right: none; padding-bottom: env(safe-area-inset-bottom); }
+    .email-detail { position: fixed; inset: 0; top: var(--header-h); z-index: 20; display: none; }
     .email-detail.visible { display: flex; }
-    .detail-inner { padding: var(--s-5); }
-    .detail-subject { font-size: 20px; }
-    .detail-toolbar { padding-left: var(--s-5); padding-right: var(--s-5); }
-    .compose { width: 100%; max-height: 100vh; }
-    .modal-overlay { padding: 0; align-items: flex-end; }
     .back-btn { display: flex; }
     .search-wrap { max-width: none; }
     .kbd-hint { display: none; }
+
+    /* list rows: actions inline & always tappable (no hover on touch) */
+    .email-item { padding: 14px var(--s-4); align-items: center; }
+    .email-item .item-actions { position: static; opacity: 1; transform: none;
+      background: none; border: none; box-shadow: none; padding: 0; gap: 2px; align-self: center; flex-shrink: 0; }
+    .email-item .icon-btn { padding: 8px; }
+    .sender-avatar { width: 42px; height: 42px; }
+
+    /* detail toolbar → one swipeable row */
+    .detail-toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+      gap: var(--s-2); padding: var(--s-3) var(--s-4);
+      padding-left: max(var(--s-4), env(safe-area-inset-left));
+      padding-right: max(var(--s-4), env(safe-area-inset-right)); }
+    .detail-toolbar::-webkit-scrollbar { display: none; }
+    .detail-toolbar .tb-btn { flex-shrink: 0; padding: 9px 13px; }
+    .detail-toolbar .spacer { display: none; }
+    .detail-inner { padding: var(--s-5) var(--s-5) max(var(--s-6), env(safe-area-inset-bottom)); }
+    .detail-subject { font-size: 21px; }
+    .detail-meta { gap: var(--s-3); }
+    .detail-body-iframe { border-radius: var(--r-sm); }
+
+    /* compose / connect → bottom sheet */
+    .modal-overlay { padding: 0; align-items: flex-end; }
+    .compose { width: 100%; max-width: 100%; max-height: 92dvh;
+      border-radius: var(--r-xl) var(--r-xl) 0 0; }
+    .compose-foot { padding-bottom: max(var(--s-4), env(safe-area-inset-bottom)); flex-wrap: wrap; }
+    .composer-body textarea, .compose-body textarea { min-height: 160px; }
+
+    /* AI bar stacks cleanly */
+    .ai-spark { display: none; }
+    .ai-input { flex: 1 1 100%; }
+    .ai-tone, .ai-btn { flex: 1 1 auto; justify-content: center; }
   }
+
+  /* very small phones */
+  @media (max-width: 480px) {
+    .logo span { display: none; }
+    .logo-icon { width: 34px; height: 34px; }
+    header { padding-left: max(var(--s-3), env(safe-area-inset-left));
+      padding-right: max(var(--s-3), env(safe-area-inset-right)); }
+    .user-chip span { display: none; }
+    .user-chip { padding: 4px; }
+    .ghost-btn { width: 38px; height: 38px; }
+    .list-header { padding: var(--s-3) var(--s-4); }
+    .group-head { padding: var(--s-3) var(--s-4) 6px; }
+    .email-snippet { -webkit-line-clamp: 1; }
+    .detail-subject { font-size: 19px; }
+  }
+
+  /* touch devices: never rely on hover to reveal row actions */
+  @media (hover: none) {
+    .email-item .item-actions { opacity: 1; transform: none; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   }
@@ -530,6 +600,8 @@
     </button>
     <div class="sidebar-profile" id="sidebar-profile"></div>
   </nav>
+
+  <div class="nav-scrim" onclick="document.body.classList.remove('menu-open')" aria-hidden="true"></div>
 
   <div class="email-list" id="email-list">
     <div class="loading"><div class="spinner"></div> Connecting…</div>
@@ -595,7 +667,7 @@
 
 <!-- CONNECT (IMAP) MODAL -->
 <div class="modal-overlay" id="connect-overlay" style="align-items:center;justify-content:center;padding:24px;">
-  <div class="compose" style="width:460px;">
+  <div class="compose" style="width:min(460px,calc(100vw - 32px));">
     <div class="compose-head">
       <span id="connect-title">Add account</span>
       <button class="ghost-btn" style="width:32px;height:32px" onclick="closeConnect()" title="Close">
