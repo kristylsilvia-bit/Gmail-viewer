@@ -402,6 +402,31 @@
   .send-btn:disabled { opacity: 0.5; cursor: default; }
   .compose-status { font-size: 13px; color: var(--text3); }
 
+  /* ── AI ASSIST BAR ── */
+  .ai-bar { display: flex; flex-direction: column; gap: 8px; padding: var(--s-3) var(--s-5);
+    border-bottom: 1px solid var(--border); background: var(--aurora-soft); }
+  .ai-row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+  .ai-spark { display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--r-sm);
+    background: var(--aurora); color: #fff; flex-shrink: 0; box-shadow: 0 4px 12px -3px var(--accent-glow); }
+  .ai-input { flex: 1; min-width: 160px; background: var(--surface); border: 1px solid var(--border2);
+    border-radius: var(--r-sm); padding: 9px 12px; font-size: 13.5px; color: var(--text); outline: none;
+    transition: border-color var(--t-fast), box-shadow var(--t-fast); }
+  .ai-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--selected); }
+  .ai-tone { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--r-sm);
+    padding: 9px 10px; font-size: 13px; color: var(--text); cursor: pointer; outline: none; }
+  .ai-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: var(--r-sm);
+    font-size: 13px; font-weight: 650; cursor: pointer; border: 1px solid var(--accent);
+    color: var(--accent2); background: var(--accent-bg); white-space: nowrap;
+    transition: background var(--t-fast), color var(--t-fast), filter var(--t-fast); }
+  .ai-btn:hover { filter: brightness(1.08); }
+  .ai-btn.ghost { border-color: var(--border2); color: var(--text2); background: none; }
+  .ai-btn.ghost:hover { color: var(--text); background: var(--hover); }
+  .ai-btn:disabled { opacity: .55; cursor: default; filter: none; }
+  .ai-btn .mini-spin { width: 13px; height: 13px; border: 2px solid currentColor; border-top-color: transparent;
+    border-radius: 50%; animation: spin .65s linear infinite; }
+  .ai-status { font-size: 12px; color: var(--text2); min-height: 0; }
+  .ai-status.err { color: var(--danger); }
+
   /* ── TOAST ── */
   #toast { position: fixed; bottom: var(--s-6); left: 50%; transform: translateX(-50%) translateY(80px);
     background: var(--surface3); border: 1px solid var(--border2); color: var(--text);
@@ -537,7 +562,26 @@
       <div class="compose-field"><label>To</label><input id="c-to" type="text" placeholder="recipient@example.com"></div>
       <div class="compose-field"><label>Cc</label><input id="c-cc" type="text" placeholder="optional"></div>
       <div class="compose-field"><label>Subject</label><input id="c-subject" type="text" placeholder="Subject"></div>
-      <textarea id="c-body" placeholder="Write something brilliant…"></textarea>
+      <div class="ai-bar">
+        <div class="ai-row">
+          <span class="ai-spark" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 14l.8 2L22 16.8 20 17.6 19 20l-.8-2.4L16 16.8 18.2 16 19 14z"/></svg>
+          </span>
+          <input id="ai-instruction" class="ai-input" type="text" placeholder="Tell AI what to write… e.g. “decline politely, suggest next week”" onkeydown="if(event.key==='Enter'){event.preventDefault();aiGenerate('compose')}">
+          <select id="ai-tone" class="ai-tone" aria-label="Tone">
+            <option value="professional">Professional</option>
+            <option value="friendly">Friendly</option>
+            <option value="concise">Concise</option>
+            <option value="warm">Warm</option>
+            <option value="formal">Formal</option>
+            <option value="persuasive">Persuasive</option>
+          </select>
+          <button class="ai-btn" id="ai-generate-btn" onclick="aiGenerate('compose')">Generate</button>
+          <button class="ai-btn ghost" id="ai-improve-btn" onclick="aiGenerate('improve')" title="Rewrite the current draft">Improve draft</button>
+        </div>
+        <div class="ai-status" id="ai-status"></div>
+      </div>
+      <textarea id="c-body" placeholder="Write something brilliant…  — or let AI draft it above ✨"></textarea>
     </div>
     <div class="compose-foot">
       <button class="send-btn" id="send-btn" onclick="sendEmail()">
@@ -1152,6 +1196,9 @@ function openCompose(reply) {
   document.getElementById('compose-overlay').classList.add('open');
   document.getElementById('compose-status').textContent = '';
   document.getElementById('c-cc').value = '';
+  document.getElementById('ai-instruction').value = '';
+  const aiStatus = document.getElementById('ai-status'); aiStatus.textContent = ''; aiStatus.className = 'ai-status';
+  document.getElementById('ai-improve-btn').textContent = composeReply ? 'Improve reply' : 'Improve draft';
   if (reply) {
     document.getElementById('compose-title').textContent = 'Reply';
     document.getElementById('c-to').value = reply.to || '';
@@ -1264,6 +1311,57 @@ async function sendEmail() {
     }
   } finally {
     btn.disabled = false;
+  }
+}
+
+// ── AI WRITING ASSISTANT (Gemini via /api/ai) ──
+async function aiGenerate(mode) {
+  const instruction = document.getElementById('ai-instruction').value.trim();
+  const tone = document.getElementById('ai-tone').value;
+  const draft = document.getElementById('c-body').value;
+  const to = document.getElementById('c-to').value.trim();
+  const subject = document.getElementById('c-subject').value.trim();
+  const statusEl = document.getElementById('ai-status');
+  const genBtn = document.getElementById('ai-generate-btn');
+  const impBtn = document.getElementById('ai-improve-btn');
+
+  // For replies, the composer is pre-filled with quoted text; treat as reply guidance.
+  if (mode === 'compose' && composeReply) mode = 'reply';
+
+  if (mode === 'compose' && !instruction) { statusEl.className = 'ai-status err'; statusEl.textContent = 'Tell the assistant what to write first.'; return; }
+  if (mode === 'improve' && !draft.trim()) { statusEl.className = 'ai-status err'; statusEl.textContent = 'Write a draft to improve, or use Generate.'; return; }
+
+  const activeBtn = mode === 'improve' ? impBtn : genBtn;
+  const original = activeBtn.innerHTML;
+  activeBtn.disabled = true; genBtn.disabled = true; impBtn.disabled = true;
+  activeBtn.innerHTML = `<span class="mini-spin"></span> ${mode === 'improve' ? 'Improving…' : 'Writing…'}`;
+  statusEl.className = 'ai-status'; statusEl.textContent = 'Gemini is drafting your email…';
+
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, instruction, draft, to, subject, tone }),
+    });
+    const data = await res.json().catch(() => ({ error: res.statusText }));
+    if (!res.ok) throw new Error(data.error || res.statusText);
+
+    const bodyEl = document.getElementById('c-body');
+    if (mode === 'improve' || mode === 'reply') {
+      // Keep any quoted reply text that follows the user's draft.
+      const quoteIdx = draft.search(/\n*On .+ wrote:/);
+      const tail = quoteIdx > -1 ? draft.slice(quoteIdx) : '';
+      bodyEl.value = data.text + (tail ? '\n' + tail : '');
+    } else {
+      bodyEl.value = data.text;
+    }
+    statusEl.className = 'ai-status'; statusEl.textContent = '✨ Drafted with ' + (data.model || 'Gemini') + ' — edit as you like.';
+    document.getElementById('ai-instruction').value = '';
+    bodyEl.focus();
+  } catch (e) {
+    statusEl.className = 'ai-status err'; statusEl.textContent = e.message;
+  } finally {
+    genBtn.disabled = false; impBtn.disabled = false;
+    activeBtn.innerHTML = original;
   }
 }
 
