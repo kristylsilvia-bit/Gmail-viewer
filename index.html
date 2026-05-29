@@ -789,7 +789,11 @@ function renderAccountMenu() {
     </button>
     <button class="menu-btn" onclick="openConnect('yahoo')">
       <span class="prov-dot" style="background:#7e1fff"></span> Add Yahoo
-    </button>`;
+    </button>
+    <div class="menu-divider"></div>
+    <a class="menu-btn" href="/api/auth?show=1" style="text-decoration:none;color:var(--text3)">
+      <span class="prov-dot" style="background:var(--accent)"></span> Get refresh token (setup)
+    </a>`;
 }
 
 function toggleAccountMenu(e) { e.stopPropagation(); document.getElementById('account-menu').classList.toggle('open'); }
