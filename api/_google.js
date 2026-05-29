@@ -1,4 +1,7 @@
-// Shared helpers for Google OAuth + Gmail API (multi-account, cookie-based)
+// Shared helpers for Google OAuth + Gmail API (multi-account).
+// Accounts persist in a shared cross-device store when one is configured
+// (see _store.js); otherwise they fall back to per-device cookies.
+import { storeReady, storeGet, storeSet, storeDel } from './_store.js';
 
 export const OAUTH_SCOPES = [
   'https://mail.google.com/',
@@ -30,8 +33,16 @@ const ACCOUNTS_COOKIE = 'gv_accounts';
 const ACTIVE_COOKIE = 'gv_active';
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
+// Global keys for the shared store — every device/visitor shares these.
+const STORE_ACCOUNTS = 'gv:shared:accounts';
+const STORE_ACTIVE = 'gv:shared:active';
+
 // accounts = [{ email, name, refreshToken }]
-export function getAccounts(req) {
+export async function getAccounts(req) {
+  if (storeReady()) {
+    const a = await storeGet(STORE_ACCOUNTS);
+    return Array.isArray(a) ? a : [];
+  }
   const cookies = parseCookies(req);
   if (!cookies[ACCOUNTS_COOKIE]) return [];
   try {
@@ -41,25 +52,41 @@ export function getAccounts(req) {
   }
 }
 
-export function getActiveEmail(req) {
+export async function getActiveEmail(req) {
+  if (storeReady()) {
+    return (await storeGet(STORE_ACTIVE)) || null;
+  }
   const cookies = parseCookies(req);
   return cookies[ACTIVE_COOKIE] || null;
 }
 
-export function saveAccounts(res, accounts) {
+export async function saveAccounts(res, accounts) {
+  if (storeReady()) {
+    await storeSet(STORE_ACCOUNTS, accounts);
+    return;
+  }
   const val = Buffer.from(JSON.stringify(accounts)).toString('base64');
   appendCookies(res, [
     `${ACCOUNTS_COOKIE}=${val}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${ONE_YEAR}`,
   ]);
 }
 
-export function setActive(res, email) {
+export async function setActive(res, email) {
+  if (storeReady()) {
+    await storeSet(STORE_ACTIVE, email || '');
+    return;
+  }
   appendCookies(res, [
     `${ACTIVE_COOKIE}=${encodeURIComponent(email)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${ONE_YEAR}`,
   ]);
 }
 
-export function clearAccountCookies(res) {
+export async function clearAccountCookies(res) {
+  if (storeReady()) {
+    await storeDel(STORE_ACCOUNTS);
+    await storeDel(STORE_ACTIVE);
+    return;
+  }
   appendCookies(res, [
     `${ACCOUNTS_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
     `${ACTIVE_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
@@ -68,9 +95,9 @@ export function clearAccountCookies(res) {
 
 // Resolve which account/refresh-token the request should act as.
 // Falls back to the env-var refresh token for backwards compatibility.
-export function resolveAccount(req) {
-  const accounts = getAccounts(req);
-  const active = getActiveEmail(req);
+export async function resolveAccount(req) {
+  const accounts = await getAccounts(req);
+  const active = await getActiveEmail(req);
   if (accounts.length) {
     const found = accounts.find(a => a.email === active) || accounts[0];
     return { ...found, kind: found.kind || 'google', source: 'cookie' };

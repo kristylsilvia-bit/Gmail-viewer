@@ -47,14 +47,14 @@ export default async function handler(req, res) {
     const email = profile.email || '';
     const name = profile.name || '';
 
-    const accounts = getAccounts(req);
+    const accounts = await getAccounts(req);
     const idx = accounts.findIndex(a => a.email === email);
     const entry = { kind: 'google', email, name, refreshToken };
     if (idx > -1) accounts[idx] = entry;
     else accounts.push(entry);
 
-    saveAccounts(res, accounts);
-    setActive(res, email);
+    await saveAccounts(res, accounts);
+    await setActive(res, email);
 
     res.setHeader('Content-Type', 'text/html');
     res.send(`<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/"></head>
