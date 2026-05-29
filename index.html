@@ -776,8 +776,11 @@ function renderAccountMenu() {
     }).join('')}
     <div class="menu-divider"></div>
     <a class="menu-btn" href="/api/auth" style="text-decoration:none">
-      <span class="prov-dot" style="background:#ea4335"></span> Add Google / Gmail
+      <span class="prov-dot" style="background:#ea4335"></span> Add Google / Gmail (sign-in)
     </a>
+    <button class="menu-btn" onclick="openConnect('gmail')">
+      <span class="prov-dot" style="background:#ea4335"></span> Add Gmail / Workspace (app password)
+    </button>
     <button class="menu-btn" onclick="openConnect('icloud')">
       <span class="prov-dot" style="background:#3b9dff"></span> Add iCloud
     </button>
@@ -894,11 +897,12 @@ function showAuthGate() {
       Sign in with Google
     </a>
     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn-load" onclick="openConnect('gmail')">Add Gmail / Workspace</button>
       <button class="btn-load" onclick="openConnect('icloud')">Add iCloud</button>
       <button class="btn-load" onclick="openConnect('aol')">Add AOL</button>
       <button class="btn-load" onclick="openConnect('yahoo')">Add Yahoo</button>
     </div>
-    <p style="font-size:12px;color:var(--text3)">iCloud, AOL and Yahoo require an app-specific password.</p>
+    <p style="font-size:12px;color:var(--text3)">Gmail, iCloud, AOL and Yahoo connect with an app-specific password.</p>
   </div>`;
 }
 
@@ -1217,6 +1221,7 @@ function closeCompose() { document.getElementById('compose-overlay').classList.r
 
 // ── CONNECT IMAP ACCOUNTS (iCloud / AOL / Yahoo) ──
 const PROVIDERS = {
+  gmail: { label: 'Gmail / Google Workspace', hint: 'For Gmail or a school/work Google Workspace account, sign in with your full email and a Google app password (not your normal password). This requires 2-Step Verification to be on, and your admin must allow IMAP and app passwords. If your school blocks these, contact IT.', help: 'https://support.google.com/mail/answer/185833', helpText: 'How to create a Google app password →' },
   icloud: { label: 'iCloud', hint: 'Sign in with your iCloud email and an app-specific password. Your Apple ID password will not work — generate one at appleid.apple.com under Sign-In & Security.', help: 'https://support.apple.com/en-us/102654', helpText: 'How to create an iCloud app-specific password →' },
   aol: { label: 'AOL', hint: 'Sign in with your AOL email and an app password. Generate one in AOL Account Security → Generate app password.', help: 'https://help.aol.com/articles/Create-and-manage-app-password', helpText: 'How to create an AOL app password →' },
   yahoo: { label: 'Yahoo', hint: 'Sign in with your Yahoo email and an app password. Generate one in Yahoo Account Security → Generate app password.', help: 'https://help.yahoo.com/kb/SLN15241.html', helpText: 'How to create a Yahoo app password →' },
